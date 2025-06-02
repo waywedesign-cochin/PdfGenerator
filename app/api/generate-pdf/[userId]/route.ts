@@ -113,7 +113,7 @@ type Params = {
   userId: string;
 };
 
-export async function GET(_: Request, { params }: { params: Params }) {
+export async function GET(request: Request, { params }: { params: Params }) {
   try {
     const userId = params.userId;
 
