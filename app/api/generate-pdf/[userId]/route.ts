@@ -98,7 +98,7 @@
 //     );
 //   }
 // }
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import puppeteer from "puppeteer";
 
 // Helper to generate SVG placeholder
@@ -109,13 +109,11 @@ const generatePlaceholderSVG = (text: string) =>
       <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" fill="#666">${text}</text>
     </svg>`
   )}`;
-type Params = {
-  userId: string;
-};
 
-export async function GET(request: Request, { params }: { params: Params }) {
+export async function GET(request: NextRequest) {
   try {
-    const userId = params.userId;
+    const params = request.nextUrl.searchParams;
+    const userId = params.get("userId");
 
     const [userRes, postsRes, photosRes] = await Promise.all([
       fetch(`https://jsonplaceholder.typicode.com/users/${userId}`),
