@@ -1,107 +1,8 @@
-// import { NextResponse } from "next/server";
-// import puppeteer from "puppeteer";
+// app/actions/generate-pdf.ts
+"use server";
 
-// export async function GET(
-//   _: Request,
-//   { params }: { params: { userId: string } }
-// ) {
-//   try {
-//     const userId = params.userId;
-
-//     const [userRes, postsRes, photosRes] = await Promise.all([
-//       fetch(`https://jsonplaceholder.typicode.com/users/${userId}`),
-//       fetch(`https://jsonplaceholder.typicode.com/users/${userId}/posts`),
-//       fetch(`https://jsonplaceholder.typicode.com/photos?albumId=${userId}`),
-//     ]);
-
-//     if (!userRes.ok) {
-//       return new NextResponse(JSON.stringify({ error: "User not found" }), {
-//         status: 404,
-//       });
-//     }
-
-//     const user = await userRes.json();
-//     const posts = await postsRes.json();
-//     const photos = await photosRes.json();
-
-//     // 🧾 Prepare HTML content for PDF
-//     const html = `
-//       <html>
-//         <head>
-//           <style>
-//             body { font-family: sans-serif; padding: 20px; }
-//             h1 { color: #333; }
-//             ul { padding-left: 20px; }
-//             li { margin-bottom: 8px; }
-//             img { max-width: 100px; }
-//           </style>
-//         </head>
-//         <body>
-//           <h1>User Report: ${user.name}</h1>
-//           <img src="${photos[0]?.url}" alt="User Photo" />
-//           <p><strong>Email:</strong> ${user.email}</p>
-//           <p><strong>Company:</strong> ${user.company.name}</p>
-//           <h2>Posts</h2>
-//           <ul>
-//             ${posts
-//               .slice(0, 5)
-//               .map((post: { title: string }) => `<li>${post.title}</li>`)
-//               .join("")}
-//           </ul>
-//         </body>
-//       </html>
-//     `;
-
-//     // 🖨️ Generate PDF using Puppeteer
-//     const browser = await puppeteer.launch({
-//       headless: true,
-//       args: ["--no-sandbox", "--disable-setuid-sandbox"],
-//     });
-//     const page = await browser.newPage();
-//     await page.setContent(html, { waitUntil: "networkidle0" });
-
-//     await page.evaluate(async () => {
-//       const imgs = Array.from(document.images);
-//       await Promise.all(
-//         imgs.map((img) => {
-//           if (img.complete) return;
-//           return new Promise((resolve, reject) => {
-//             img.onload = resolve;
-//             img.onerror = reject;
-//           });
-//         })
-//       );
-//     });
-
-//     const pdfBuffer = await page.pdf({
-//       format: "A4",
-//       printBackground: true,
-//     });
-
-//     await browser.close();
-
-//     const buffer = Buffer.from(pdfBuffer);
-//     // 📄 Return actual PDF file
-//     return new NextResponse(buffer, {
-//       headers: {
-//         "Content-Type": "application/pdf",
-//         "Content-Disposition": `attachment; filename="user-${userId}-report.pdf"`,
-//       },
-//     });
-//   } catch (err) {
-//     console.error(err);
-//     return new NextResponse(
-//       JSON.stringify({ error: "PDF generation failed" }),
-//       {
-//         status: 500,
-//       }
-//     );
-//   }
-// }
-import { NextRequest, NextResponse } from "next/server";
 import puppeteer from "puppeteer";
 
-// Helper to generate SVG placeholder
 const generatePlaceholderSVG = (text: string) =>
   `data:image/svg+xml;charset=utf-8,${encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="150" height="150" viewBox="0 0 150 150">
@@ -110,13 +11,8 @@ const generatePlaceholderSVG = (text: string) =>
     </svg>`
   )}`;
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { userId: string } }
-) {
+export async function generateUserPDF(userId: string) {
   try {
-    const userId = params.userId;
-
     const [userRes, postsRes, photosRes] = await Promise.all([
       fetch(`https://jsonplaceholder.typicode.com/users/${userId}`),
       fetch(`https://jsonplaceholder.typicode.com/users/${userId}/posts`),
@@ -124,27 +20,19 @@ export async function GET(
     ]);
 
     if (!userRes.ok) {
-      return new NextResponse(JSON.stringify({ error: "User not found" }), {
-        status: 404,
-      });
+      throw new Error("User not found");
     }
 
     const user = await userRes.json();
     const posts = await postsRes.json();
     const photos = await photosRes.json();
 
-    // Handle image - try to fetch or use SVG placeholder
+    // Handle image
     let imageSrc = generatePlaceholderSVG("User Photo");
     if (photos[0]?.url) {
       try {
-        // const imageRes = await fetch(photos[0].url);
         const imageRes = await fetch(
-          `https://picsum.photos/150?random=${userId}`,
-          {
-            headers: {
-              "Content-Type": "image/jpeg",
-            },
-          }
+          `https://picsum.photos/150?random=${userId}`
         );
         if (imageRes.ok) {
           const imageBuffer = await imageRes.arrayBuffer();
@@ -406,19 +294,10 @@ export async function GET(
     });
     await browser.close();
 
-    return new NextResponse(Buffer.from(pdfBuffer), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="user-${userId}-report.pdf"`,
-      },
-    });
+    // Convert to base64 for easier handling
+    return Buffer.from(pdfBuffer).toString("base64");
   } catch (err) {
     console.error("PDF generation error:", err);
-    return new NextResponse(
-      JSON.stringify({ error: "PDF generation failed" }),
-      {
-        status: 500,
-      }
-    );
+    throw new Error("Failed to generate PDF");
   }
 }
